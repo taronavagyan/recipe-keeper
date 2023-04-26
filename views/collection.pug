@@ -1,0 +1,94 @@
+extends layout
+
+block main
+  section#recipe-collection
+    header
+      h2= recipeCollection.title
+      form.edit(action=`/collections/${recipeCollection.id}/edit` method="get")
+        button Edit Collection
+      form.delete(action=`/collections/${recipeCollection.id}/destroy` method="post")
+        button Delete Collection
+
+    ul
+      each recipe in recipeCollection.recipes
+        li
+          h3= recipe.title
+          a(href=`/collections/${recipeCollection.id}/recipes/${recipe.id}`) View Recipe
+          form.edit(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/destroy` method="get")
+            button Delete Recipe
+
+    form(action=`/collections/${recipeCollection.id}/recipes` method="post")
+      dl
+        dt
+          label(for="title") Enter a new recipe title:
+        dd
+          input(type="text"
+                name="title"
+                id="title"
+                placeholder="Title"
+                value=title)
+        dt
+          label(for="prepTime") Enter the new recipe's prep time:
+        dd
+          input(type="text"
+                name="prepTime"
+                id="prepTime"
+                placeholder="Prep Time"
+                value=prepTime)
+        dt
+          label(for="totalTime") Enter the new recipe's total cooking time:
+        dd
+          input(type="text"
+                name="totalTime"
+                id="totalTime"
+                placeholder="Total Cook Time"
+                value=totalTime)
+        dt
+          label(for="instructions") Enter the new recipe's instructions:
+        dd
+          input(type="text"
+                name="instructions"
+                id="instructions"
+                placeholder="Instructions"
+                value=instructions)
+        dt
+          label(for="ingredients") Enter the new recipe's ingredients:
+        dd#ingredients
+          div.ingredient
+            input(type="text" name="ingredientName[]" placeholder="Ingredient name")
+            input(type="text" name="ingredientQuantity[]" placeholder="Quantity")
+            input(type="text" name="ingredientUnit[]" placeholder="Unit")
+          button(type="button" id="addIngredientButton") Add Ingredient
+
+
+      fieldset.actions
+        button Add Recipe
+  script.
+    // Dynamically add ingredient fields when the "Add Ingredient" button is clicked
+    const addIngredientButton = document.getElementById("addIngredientButton");
+    const ingredientsContainer = document.getElementById("ingredients");
+    
+    addIngredientButton.addEventListener("click", () => {
+      const ingredientFields = document.createElement("div");
+      ingredientFields.classList.add("ingredient");
+      ingredientFields.innerHTML = `
+        <input type="text" name="ingredientName[]" placeholder="Ingredient name">
+        <input type="text" name="ingredientQuantity[]" placeholder="Quantity">
+        <input type="text" name="ingredientUnit[]" placeholder="Unit">
+        <button type="button" class="deleteIngredientButton">Delete</button>
+      `;
+      ingredientsContainer.appendChild(ingredientFields);
+
+      const deleteButtons = document.querySelectorAll(".deleteIngredientButton");
+      deleteButtons.forEach(button => {
+        button.addEventListener("click", () => {
+          button.parentNode.remove();
+        });
+      });
+    });     
+
+
+
+block headerLinks
+  .actions
+    a.list(href="/collections") All Collections

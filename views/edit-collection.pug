@@ -1,0 +1,19 @@
+extends layout
+
+block main
+  section#recipes
+    header
+      h2 Editing '#{recipeCollection.title}'
+
+  form(action=`/collections/${recipeCollection.id}/edit` method="post")
+    dl
+      dt
+        label(for="recipeCollectionTitle") Enter the new title for the recipe collection:
+      dd
+        input(type="text"
+              name="recipeCollectionTitle"
+              placeholder="Recipe Collection Title"
+              value=recipeCollectionTitle || recipeCollection.title)
+    fieldset.actions
+      input(type="submit" value="Save")
+      a(href=`/collections/${recipeCollection.id}`) Cancel

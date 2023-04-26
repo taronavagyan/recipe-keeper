@@ -4,8 +4,13 @@ block main
   if recipeCollections === undefined || recipeCollections.length === 0
     p#no_collection You don't have any recipe collections. Why not create one?
   else 
-    p You have some recipe collections. We need to list them.
+    ul#lists
+      each recipeCollection in recipeCollections
+        li(class=recipeCollection)
+          a(href=`/collections/${recipeCollection.id}`)
+            h2= recipeCollection.title
+            p= recipeCollection.recipes.length
 
 block headerLinks
   .actions
-    a.add(href="/lists/new") New Recipe Collection
+    a.add(href="/collections/new") New Recipe Collection

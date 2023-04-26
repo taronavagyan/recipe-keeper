@@ -1,0 +1,20 @@
+extends layout
+
+block main
+  section#recipe
+    header
+      h2= recipe.title
+      p Prep Time: #{recipe.prepTime}
+      p Total Time: #{recipe.totalTime}
+    article
+      h3 Ingredients
+      ul
+        each ingredient in recipe.ingredients
+          li= `${ingredient.name} - ${ingredient.quantity} ${ingredient.unit}`
+      h3 Instructions
+      p= recipe.instructions
+
+block headerLinks
+  .actions
+    a.list(href="/collections") All Collections
+    a.list(href=`/collections/${recipeCollectionId}`) Current Collection
