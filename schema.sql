@@ -1,4 +1,4 @@
-CREATE TABLE recipe_collections (
+CREATE TABLE recipeCollections (
   id serial PRIMARY KEY,
   title text NOT NULL UNIQUE
 );
@@ -9,7 +9,7 @@ CREATE TABLE recipes (
   prep_time integer NOT NULL DEFAULT 0,
   total_time integer NOT NULL CHECK (total_time >= prep_time),
   instructions text NOT NULL UNIQUE,
-  collection_id integer NOT NULL REFERENCES recipe_collections(id) ON DELETE CASCADE
+  collection_id integer NOT NULL REFERENCES recipeCollections(id) ON DELETE CASCADE
 );
 
 CREATE TABLE ingredients (

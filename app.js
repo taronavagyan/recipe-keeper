@@ -4,7 +4,8 @@ const flash = require("express-flash");
 const session = require("express-session");
 const { body, validationResult } = require("express-validator");
 const store = require("connect-loki");
-const SessionPersistence = require("./lib/session-persistence");
+const PgPersistence = require("./lib/pg-persistence");
+const catchError = require("./lib/catch-error");
 
 const app = express();
 const host = "localhost";
@@ -38,7 +39,7 @@ app.use(flash());
 
 // Create a new datastore
 app.use((req, res, next) => {
-  res.locals.store = new SessionPersistence(req.session);
+  res.locals.store = new PgPersistence(req.session);
   next();
 });
 
@@ -54,18 +55,22 @@ app.get("/", (req, res) => {
 });
 
 // Render the list of recipe collections
-app.get("/collections", (req, res) => {
-  res.render("collections", {
-    recipeCollections: res.locals.store.sortedRecipeCollections(),
-  });
-});
+app.get(
+  "/collections",
+  catchError(async (req, res) => {
+    let store = res.locals.store;
+    let recipeCollections = await store.sortedRecipeCollections();
+
+    res.render("collections", { recipeCollections });
+  })
+);
 
 // Render new collection page
 app.get("/collections/new", (req, res) => {
   res.render("new-collection");
 });
 
-// Create a new collection
+// Create a new recipe collection
 app.post(
   "/collections",
   [
@@ -76,40 +81,57 @@ app.post(
       .isLength({ max: 100 })
       .withMessage("Collection title must be between 1 and 100 characters."),
   ],
-  (req, res) => {
+  catchError(async (req, res) => {
+    let store = res.locals.store;
     let errors = validationResult(req);
+    let recipeCollectionTitle = req.body.recipeCollectionTitle;
+
+    const rerenderNewCollection = () => {
+      res.render("new-collection", {
+        recipeCollectionTitle,
+        flash: req.flash(),
+      });
+    };
+
     if (!errors.isEmpty()) {
       errors.array().forEach((message) => req.flash("error", message.msg));
-      res.render("new-collection", {
-        flash: req.flash(),
-        recipeCollectionTitle: req.body.recipeCollectionTitle,
-      });
+      rerenderNewCollection();
+    } else if (await store.findRecipeIdFromTitle(recipeCollectionTitle)) {
+      req.flash("error", "The collection title must be unique.");
+      rerenderNewCollection();
     } else {
-      req.session.recipeCollections.push(
-        new RecipeCollection(req.body.recipeCollectionTitle)
-      );
-      req.flash("success", "The recipe collection has been created.");
-      res.redirect("/collections");
+      let created = await store.createRecipeCollection(recipeCollectionTitle);
+
+      if (!created) {
+        req.flash("error", "The recipe collection title must be unique.");
+        rerenderNewCollection();
+      } else {
+        req.flash("success", "The recipe collection has been created.");
+        res.redirect("/collections");
+      }
     }
-  }
+  })
 );
 
 // Render individual recipe collection and its recipes
-app.get("/collections/:recipeCollectionId", (req, res, next) => {
-  let recipeCollectionId = req.params.recipeCollectionId;
+app.get(
+  "/collections/:recipeCollectionId",
+  catchError(async (req, res) => {
+    let recipeCollectionId = req.params.recipeCollectionId;
+    let recipeCollection = await res.locals.store.loadRecipeCollection(
+      +recipeCollectionId
+    );
 
-  let recipeCollection = res.locals.store.loadRecipeCollection(
-    +recipeCollectionId
-  );
-  if (recipeCollection === undefined) {
-    next(new Error("Not found."));
-  } else {
+    if (recipeCollection === undefined) throw new Error("Not found.");
+
+    // Sort recipes in collection
     recipeCollection.recipes = res.locals.store.sortedRecipes(recipeCollection);
+
     res.render("collection", {
       recipeCollection,
     });
-  }
-});
+  })
+);
 
 // Edit a recipe
 // app.get(
@@ -118,53 +140,48 @@ app.get("/collections/:recipeCollectionId", (req, res, next) => {
 // );
 
 // Delete recipe from recipe collection
-app.get(
+app.post(
   "/collections/:recipeCollectionId/recipes/:recipeId/destroy",
-  (req, res, next) => {
+  catchError(async (req, res) => {
     let { recipeCollectionId, recipeId } = { ...req.params };
-    let deleted = res.locals.store.deleteRecipe(+recipeCollectionId, +recipeId);
+    let deleted = await res.locals.store.deleteRecipe(
+      +recipeCollectionId,
+      +recipeId
+    );
 
-    if (!deleted) {
-      next(new Error("Not found."));
-    } else {
-      req.flash("success", "The recipe has been deleted.");
-      res.redirect(`/collections/${recipeCollectionId}`);
-    }
-  }
+    if (!deleted) throw new Error("Not found.");
+
+    req.flash("success", "The recipe has been deleted.");
+    res.redirect(`/collections/${recipeCollectionId}`);
+  })
 );
 
-app.get("/collections/:recipeCollectionId/edit", (req, res, next) => {
-  let recipeCollectionId = req.params.recipeCollectionId;
-  let recipeCollection = res.locals.store.loadRecipeCollection(
-    +recipeCollectionId
-  );
-  if (!recipeCollection) {
-    next(new Error("Not found."));
-  } else {
+app.get(
+  "/collections/:recipeCollectionId/edit",
+  catchError(async (req, res) => {
+    let recipeCollectionId = req.params.recipeCollectionId;
+    let recipeCollection = await res.locals.store.loadRecipeCollection(
+      +recipeCollectionId
+    );
+
+    if (!recipeCollection) throw new Error("Not found.");
+
     res.render("edit-collection", { recipeCollection });
-  }
-});
+  })
+);
 
 // List recipe
 app.get(
   "/collections/:recipeCollectionId/recipes/:recipeId",
-  (req, res, next) => {
+  catchError(async (req, res) => {
     let { recipeCollectionId, recipeId } = { ...req.params };
 
-    let recipeCollection = res.locals.store.loadRecipeCollection(
-      +recipeCollectionId
+    let recipe = await res.locals.store.loadRecipe(
+      +recipeCollectionId,
+      +recipeId
     );
-    if (!recipeCollection) {
-      next(new Error("Not found."));
-    } else {
-      let recipe = res.locals.store.loadRecipe(+recipeCollectionId, +recipeId);
-      if (!recipe) {
-        next(new Error("Not found."));
-      } else {
-        res.render("recipe", { recipe, recipeCollectionId });
-      }
-    }
-  }
+    res.render("recipe", { recipe, recipeCollectionId });
+  })
 );
 
 // Create a new recipe and add it to the specified collection.
@@ -178,68 +195,83 @@ app.post(
       .isLength({ max: 100 })
       .withMessage("Recipe title must be between 1 and 100 characters."),
   ],
-  (req, res, next) => {
+  catchError(async (req, res) => {
     let recipeCollectionId = req.params.recipeCollectionId;
-    let recipeCollection = res.locals.store.loadRecipeCollection(
-      +recipeCollectionId
-    );
     let recipeTitle = req.body.title;
-    if (!recipeCollection) {
-      next(new Error("Not found."));
+
+    let errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      errors.array().forEach((message) => req.flash("error", message.msg));
+
+      let recipeCollection = res.locals.store.loadRecipeCollection(
+        +recipeCollectionId
+      );
+
+      if (!recipeCollection) throw new Error("Not found.");
+
+      recipeCollection.recipes =
+        res.locals.store.sortedRecipes(recipeCollection);
+
+      res.render("collection", {
+        flash: req.flash(),
+        recipeCollection,
+        recipeTitle,
+      });
     } else {
-      let errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        errors.array().forEach((message) => req.flash("error", message.msg));
+      let store = res.locals.store;
 
-        recipeCollection.recipes =
-          res.locals.store.sortedRecipes(recipeCollection);
-        res.render("collection", {
-          flash: req.flash(),
-          recipeCollection,
-          recipeTitle,
-        });
-      } else {
-        const ingredientNames = [].concat(req.body["ingredientName[]"]);
-        const ingredientQuantities = [].concat(
-          req.body["ingredientQuantity[]"]
+      const ingredientNames = [].concat(req.body["ingredientName[]"]);
+      const ingredientQuantities = [].concat(req.body["ingredientQuantity[]"]);
+      const ingredientUnits = [].concat(req.body["ingredientUnit[]"]);
+
+      const ingredients = ingredientNames.map((name, index) => {
+        const quantity = ingredientQuantities[index];
+        const unit = ingredientUnits[index];
+        return [name, quantity, unit];
+      });
+
+      let { prepTime, totalTime, instructions } = { ...req.body };
+
+      let createdRecipe = await store.createRecipe(
+        +recipeCollectionId,
+        recipeTitle,
+        prepTime,
+        totalTime,
+        instructions,
+        ingredients
+      );
+
+      if (!createdRecipe) throw new Error("Not found.");
+
+      let recipeId = await store.findRecipeIdFromTitle(recipeTitle);
+
+      for (let ingIdx = 0; ingIdx < ingredients.length; ingIdx += 1) {
+        let createdIng = await store.createIngredient(
+          [recipeId].concat(ingredients[ingIdx])
         );
-        const ingredientUnits = [].concat(req.body["ingredientUnit[]"]);
-
-        const ingredients = ingredientNames.map((name, index) => {
-          const quantity = ingredientQuantities[index];
-          const unit = ingredientUnits[index];
-          return { name, quantity, unit };
-        });
-
-        let { prepTime, totalTime, instructions } = { ...req.body };
-
-        res.locals.store.createRecipe(
-          +recipeCollectionId,
-          recipeTitle,
-          prepTime,
-          totalTime,
-          instructions,
-          ingredients
-        );
-
-        req.flash("success", "The recipe has been created.");
-        res.redirect(`/collections/${recipeCollectionId}`);
+        if (!createdIng) throw new Error("Not found.");
       }
+
+      req.flash("success", "The recipe has been created.");
+      res.redirect(`/collections/${recipeCollectionId}`);
     }
-  }
+  })
 );
 
 // Delete recipe collection
-app.post("/collections/:recipeCollectionId/destroy", (req, res, next) => {
-  let recipeCollectionId = +req.params.recipeCollectionId;
-  let deleted = res.locals.store.deleteRecipeCollection(+recipeCollectionId);
-  if (!deleted) {
-    next(new Error("Not found."));
-  } else {
+app.post(
+  "/collections/:recipeCollectionId/destroy",
+  catchError((req, res) => {
+    let recipeCollectionId = +req.params.recipeCollectionId;
+    let deleted = res.locals.store.deleteRecipeCollection(+recipeCollectionId);
+
+    if (!deleted) throw new Error("Not found.");
+
     req.flash("success", "Recipe collection deleted.");
     res.redirect("/collections");
-  }
-});
+  })
+);
 
 // Edit recipe collection title
 app.post(
@@ -254,45 +286,52 @@ app.post(
         "Recipe collection title must be between 1 and 100 characters."
       ),
   ],
-  (req, res, next) => {
+  catchError(async (req, res) => {
     let store = res.locals.store;
     let recipeCollectionId = req.params.recipeCollectionId;
     let recipeCollectionTitle = req.body.recipeCollectionTitle;
 
-    const rerenderEditCollection = () => {
-      let recipeCollection = store.loadRecipeCollection(+recipeCollectionId);
-      if (!recipeCollection) {
-        next(new Error("Not found."));
-      } else {
-        res.render("edit-collection", {
-          recipeCollectionTitle,
-          recipeCollection,
-          flash: req.flash(),
-        });
-      }
+    const rerenderEditCollection = async () => {
+      let recipeCollection = await store.loadRecipeCollection(
+        +recipeCollectionId
+      );
+      if (!recipeCollection) throw new Error("Not found.");
+
+      res.render("edit-collection", {
+        recipeCollectionTitle,
+        recipeCollection,
+        flash: req.flash(),
+      });
     };
 
-    let errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      errors.array().forEach((message) => req.flash("error", message.msg));
-      res.rerenderEditCollection();
-    } else if (
-      res.locals.store.existsRecipeCollectionTitle(recipeCollectionTitle)
-    ) {
-      req.flash("error", "The collection title must be unique.");
-      rerenderEditCollection();
-    } else if (
-      !res.locals.store.setRecipeCollectionTitle(
-        +recipeCollectionId,
-        recipeCollectionTitle
-      )
-    ) {
-      next(new Error("Not found."));
-    } else {
-      req.flash("success", "Recipe collection updated.");
-      res.redirect(`/collections/${recipeCollectionId}`);
+    try {
+      let errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        errors.array().forEach((message) => req.flash("error", message.msg));
+        await rerenderEditCollection();
+      } else if (await store.findRecipeIdFromTitle(recipeCollectionTitle)) {
+        req.flash("error", "The collection title must be unique.");
+        await rerenderEditCollection();
+      } else {
+        let updated = await store.setRecipeCollectionTitle(
+          +recipeCollectionId,
+          recipeCollectionTitle
+        );
+
+        if (!updated) throw new Error("Not found.");
+
+        req.flash("success", "Recipe collection updated.");
+        res.redirect(`/collections/${recipeCollectionId}`);
+      }
+    } catch (error) {
+      if (store.isUniqueConstraintViolation(error)) {
+        req.flash("error", "The collection title must be unique.");
+        rerenderEditCollection();
+      } else {
+        throw error;
+      }
     }
-  }
+  })
 );
 
 app.use((err, req, res, _next) => {

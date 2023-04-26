@@ -14,7 +14,7 @@ block main
         li
           h3= recipe.title
           a(href=`/collections/${recipeCollection.id}/recipes/${recipe.id}`) View Recipe
-          form.edit(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/destroy` method="get")
+          form.edit(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/destroy` method="post")
             button Delete Recipe
 
     form(action=`/collections/${recipeCollection.id}/recipes` method="post")
@@ -63,31 +63,8 @@ block main
 
       fieldset.actions
         button Add Recipe
-  script.
-    // Dynamically add ingredient fields when the "Add Ingredient" button is clicked
-    const addIngredientButton = document.getElementById("addIngredientButton");
-    const ingredientsContainer = document.getElementById("ingredients");
+  script(src="/javascripts/collection.js")
     
-    addIngredientButton.addEventListener("click", () => {
-      const ingredientFields = document.createElement("div");
-      ingredientFields.classList.add("ingredient");
-      ingredientFields.innerHTML = `
-        <input type="text" name="ingredientName[]" placeholder="Ingredient name">
-        <input type="text" name="ingredientQuantity[]" placeholder="Quantity">
-        <input type="text" name="ingredientUnit[]" placeholder="Unit">
-        <button type="button" class="deleteIngredientButton">Delete</button>
-      `;
-      ingredientsContainer.appendChild(ingredientFields);
-
-      const deleteButtons = document.querySelectorAll(".deleteIngredientButton");
-      deleteButtons.forEach(button => {
-        button.addEventListener("click", () => {
-          button.parentNode.remove();
-        });
-      });
-    });     
-
-
 
 block headerLinks
   .actions
