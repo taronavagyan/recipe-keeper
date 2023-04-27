@@ -134,10 +134,21 @@ app.get(
 );
 
 // Edit a recipe
-// app.get(
-//   "/collections/:recipeCollectionId/recipes/:recipeId/edit",
-//   (req, res, (next) => {})
-// );
+app.get(
+  "/collections/:recipeCollectionId/recipes/:recipeId/edit",
+  catchError(async (req, res) => {
+    let { recipeCollectionId, recipeId } = { ...req.params };
+    let recipe = await res.locals.store.loadRecipe(
+      +recipeCollectionId,
+      +recipeId
+    );
+    console.log(recipe);
+
+    if (!recipe) throw new Error("Not found.");
+
+    res.render("edit-recipe", { recipe });
+  })
+);
 
 // Delete recipe from recipe collection
 app.post(
@@ -180,7 +191,19 @@ app.get(
       +recipeCollectionId,
       +recipeId
     );
+
+    if (!recipe) throw new Error("Not found.");
+
     res.render("recipe", { recipe, recipeCollectionId });
+  })
+);
+
+// INPUT VALIDATION NEEDED
+// Edit an existing recipe
+app.post(
+  "/collections/:recipeCollectionId/recipes/:recipeId/edit",
+  catchError(async (req, res) => {
+    let { recipeCollectionId, recipeId } = { ...req.params };
   })
 );
 

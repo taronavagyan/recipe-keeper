@@ -1,3 +1,7 @@
+DELETE FROM ingredients;
+DELETE FROM recipes;
+DELETE FROM recipeCollections;
+
 INSERT INTO recipeCollections (id, title) VALUES (1, 'Breads');
 INSERT INTO recipeCollections (id, title) VALUES (2, 'Sandwiches');
 INSERT INTO recipeCollections (id, title) VALUES (3, 'Soups');

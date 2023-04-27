@@ -1,3 +1,8 @@
+DROP TABLE IF EXISTS ingredients;
+DROP TABLE IF EXISTS recipes;
+DROP TABLE IF EXISTS recipeCollections;
+
+
 CREATE TABLE recipeCollections (
   id serial PRIMARY KEY,
   title text NOT NULL UNIQUE

@@ -13,14 +13,18 @@ block main
       each recipe in recipeCollection.recipes
         li
           h3= recipe.title
-          a(href=`/collections/${recipeCollection.id}/recipes/${recipe.id}`) View Recipe
-          form.edit(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/destroy` method="post")
-            button Delete Recipe
+          form(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}` method="get")
+            button(type="submit") View Recipe
+          form(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/edit` method="get")
+            button(type="submit") Edit Recipe
+          form.delete(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/destroy` method="post")
+            button(type="submit") Delete Recipe
+
 
     form(action=`/collections/${recipeCollection.id}/recipes` method="post")
       dl
         dt
-          label(for="title") Enter a new recipe title:
+          label(for="title") Enter the new recipe's title:
         dd
           input(type="text"
                 name="title"
@@ -46,11 +50,11 @@ block main
         dt
           label(for="instructions") Enter the new recipe's instructions:
         dd
-          input(type="text"
-                name="instructions"
-                id="instructions"
-                placeholder="Instructions"
-                value=instructions)
+          textarea(name="instructions"
+                   id="instructions"
+                   placeholder="Instructions"
+                   rows="5"
+                   value=instructions)
         dt
           label(for="ingredients") Enter the new recipe's ingredients:
         dd#ingredients

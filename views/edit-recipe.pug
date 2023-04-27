@@ -1,66 +1,57 @@
 extends layout
 
 block main
-  section#edit-recipe
+  section#recipe
     header
-      h2 Edit Recipe
-    form(method="POST" action=`/recipes/${recipe._id}?_method=PUT`)
-      label(for="title") Title
-      input(type="text" name="title" id="title" value=recipe.title required)
-      label(for="prepTime") Prep Time
-      input(type="text" name="prepTime" id="prepTime" value=recipe.prepTime required)
-      label(for="totalTime") Total Time
-      input(type="text" name="totalTime" id="totalTime" value=recipe.totalTime required)
-      label(for="ingredients") Ingredients
-      ul#ingredients
-        each ingredient, index in recipe.ingredients
-          li
-            input(type="text" name="ingredients[]" value=`${ingredient.name} - ${ingredient.quantity} ${ingredient.unit}` required)
-            button.delete-ingredient(type="button") Delete
-      button#add-ingredient(type="button") Add Ingredient
-      label(for="instructions") Instructions
-      textarea(name="instructions" id="instructions" required)= recipe.instructions
-      button(type="submit") Update
+      h2 Editing '#{recipe.title}'
+
+  form(action=`/recipes/${recipe.id}/edit` method="post")
+    dl
+      dt
+        label(for="recipeTitle") Enter the new title for the recipe:
+      dd
+        input(type="text"
+              name="recipeTitle"
+              placeholder="Recipe Title"
+              value=recipeTitle || recipe.title)
+      
+      dt
+        label(for="recipePrepTime") Enter the new prep time for the recipe:
+      dd
+        input(type="text"
+              name="recipePrepTime"
+              placeholder="Prep Time"
+              value=recipePrepTime || recipe.prep_time)
+              
+      dt
+        label(for="recipeTotalTime") Enter the new total time for the recipe:
+      dd
+        input(type="text"
+              name="recipeTotalTime"
+              placeholder="Total Time"
+              value=recipeTotalTime || recipe.total_time)
+      dt
+        label(for="recipeInstructions") Enter the new instructions for the recipe:
+      dd
+        textarea(name="recipeInstructions"
+                 placeholder="Instructions"
+                 rows="5"
+                 value=recipeInstructions || recipe.instructions)
+      dt
+        label(for="ingredients") Enter the new recipe's ingredients:
+      dd#ingredients
+        div.ingredient
+          input(type="text" name="ingredientName[]" placeholder="Ingredient name")
+          input(type="text" name="ingredientQuantity[]" placeholder="Quantity")
+          input(type="text" name="ingredientUnit[]" placeholder="Unit")
+        button(type="button" id="addIngredientButton") Add Ingredient
+
+    fieldset.actions
+      input(type="submit" value="Save")
+      a(href=`/collections/${recipe.collection_id}`) Cancel
+  script(src="/javascripts/collection.js")
 
 block headerLinks
   .actions
     a.list(href="/collections") All Collections
     a.list(href=`/collections/${recipeCollectionId}`) Current Collection
-
-  script.
-    const ingredientsList = document.querySelector('#ingredients');
-    const addIngredientButton = document.querySelector('#add-ingredient');
-    const deleteIngredientButtons = document.querySelectorAll('.delete-ingredient');
-
-    function createIngredientInput(value = '') {
-      const input = document.createElement('input');
-      input.type = 'text';
-      input.name = 'ingredients[]';
-      input.value = value;
-      input.required = true;
-
-      const button = document.createElement('button');
-      button.classList.add('delete-ingredient');
-      button.type = 'button';
-      button.textContent = 'Delete';
-      button.addEventListener('click', () => {
-        input.parentElement.remove();
-      });
-
-      const li = document.createElement('li');
-      li.appendChild(input);
-      li.appendChild(button);
-
-      return li;
-    }
-
-    addIngredientButton.addEventListener('click', () => {
-      const newInput = createIngredientInput();
-      ingredientsList.appendChild(newInput);
-    });
-
-    deleteIngredientButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        button.parentElement.remove();
-      });
-    });
