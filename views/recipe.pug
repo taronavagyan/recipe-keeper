@@ -6,6 +6,10 @@ block main
       h2= recipe.title
       p Prep Time: #{recipe.prep_time}
       p Total Time: #{recipe.total_time}
+      form(action=`/collections/${recipeCollectionId}/recipes/${recipe.id}/edit` method="get")
+        button(type="submit") Edit Recipe
+      form.delete(action=`/collections/${recipeCollectionId}/recipes/${recipe.id}/destroy` method="post")
+          button(type="submit") Delete Recipe
     article
       h3 Ingredients
       ul

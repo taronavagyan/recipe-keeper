@@ -5,7 +5,7 @@ block main
     header
       h2 Editing '#{recipe.title}'
 
-  form(action=`/recipes/${recipe.id}/edit` method="post")
+  form(action=`/collections/${recipe.collection_id}/recipes/${recipe.id}/edit` method="post")
     dl
       dt
         label(for="recipeTitle") Enter the new title for the recipe:
@@ -16,42 +16,48 @@ block main
               value=recipeTitle || recipe.title)
       
       dt
-        label(for="recipePrepTime") Enter the new prep time for the recipe:
+        label(for="prepTime") Enter the new preparatory time in minutes for the recipe:
       dd
-        input(type="text"
-              name="recipePrepTime"
+        input(type="number"
+              name="prepTime"
               placeholder="Prep Time"
-              value=recipePrepTime || recipe.prep_time)
+              value=recipePrepTime || recipe.prep_time
+              min="0" max="1440" required)
               
       dt
-        label(for="recipeTotalTime") Enter the new total time for the recipe:
+        label(for="totalTime") Enter the new total time in minutes for the recipe:
       dd
-        input(type="text"
-              name="recipeTotalTime"
+        input(type="number"
+              name="totalTime"
               placeholder="Total Time"
-              value=recipeTotalTime || recipe.total_time)
+              value=recipeTotalTime || recipe.total_time
+              min="1" max="1440" required)
       dt
-        label(for="recipeInstructions") Enter the new instructions for the recipe:
+        label(for="instructions") Enter the new instructions for the recipe:
       dd
-        textarea(name="recipeInstructions"
+        textarea(name="instructions"
                  placeholder="Instructions"
                  rows="5"
-                 value=recipeInstructions || recipe.instructions)
+                 required)= recipeInstructions || recipe.instructions
       dt
-        label(for="ingredients") Enter the new recipe's ingredients:
+        label(for="ingredients") Delete existing ingredients or enter new recipe's ingredients:
       dd#ingredients
-        div.ingredient
-          input(type="text" name="ingredientName[]" placeholder="Ingredient name")
-          input(type="text" name="ingredientQuantity[]" placeholder="Quantity")
-          input(type="text" name="ingredientUnit[]" placeholder="Unit")
-        button(type="button" id="addIngredientButton") Add Ingredient
+        each ingredient in recipe.ingredients 
+          div.ingredient
+            input(type="text" name="ingredientName[]" placeholder="Ingredient name" value=ingredient.name readOnly)
+            input(type="number" name="ingredientQuantity[]" placeholder="Quantity"
+            min="1" max="9999" value=ingredient.quantity readOnly)
+            input(type="text" name="ingredientUnit[]" placeholder="Unit" value=ingredient.unit readOnly)
+            button(type="button" class="deleteIngredientButton") Delete
 
+        button(type="button" id="addIngredientButton") Add Ingredient
+    
     fieldset.actions
       input(type="submit" value="Save")
       a(href=`/collections/${recipe.collection_id}`) Cancel
-  script(src="/javascripts/collection.js")
+  script(src="/javascripts/recipe.js")
 
 block headerLinks
   .actions
     a.list(href="/collections") All Collections
-    a.list(href=`/collections/${recipeCollectionId}`) Current Collection
+    a.list(href=`/collections/${recipe.collection_id}`) Current Collection

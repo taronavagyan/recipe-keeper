@@ -10,7 +10,18 @@ block main
           a(href=`/collections/${recipeCollection.id}`)
             h2= recipeCollection.title
             p= recipeCollection.recipes.length
+  footer 
+    .actions 
+      if ALL_PAGES
+        h3= "Pages"
+        each page in ALL_PAGES
+          if page === +THIS_PAGE
+            a#current-page.add(href=`/collections/page/${page}`)=`${page}  `
+          else 
+            a.add(href=`/collections/page/${page}`)=`${page}  `
+
 
 block headerLinks
   .actions
     a.add(href="/collections/new") New Recipe Collection
+

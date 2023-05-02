@@ -1,0 +1,72 @@
+extends layout
+
+block main
+  section#new-recipe
+    h2 Create New Recipe
+    form(action=`/collections/${recipeCollectionId}/recipes/new` method="post")
+      dl
+        dt
+          label(for="title") Enter the new recipe's title:
+        dd
+          input(type="text"
+                name="title"
+                id="title"
+                placeholder="Title"
+                value=recipeTitle
+                required)
+        dt
+          label(for="prepTime") Enter the new recipe's preparatory time in minutes:
+        dd
+          input(type="number"
+                name="prepTime"
+                id="prepTime"
+                placeholder="Prep Time"
+                value=prepTime
+                min="0" max="1440"
+                required)
+        dt
+          label(for="totalTime") Enter the new recipe's total cooking time in minutes:
+        dd
+          input(type="number"
+                name="totalTime"
+                id="totalTime"
+                placeholder="Total Time"
+                value=totalTime
+                min="1" max="1440"
+                required)
+        dt
+          label(for="instructions") Enter the new recipe's instructions:
+        dd
+          textarea(name="instructions"
+                   id="instructions"
+                   placeholder="Instructions"
+                   rows="5")= instructions
+        dt
+          label(for="ingredients") Enter the new recipe's ingredients:
+        dd#ingredients
+          if ingredientsInfo
+            each ingredient in ingredientsInfo
+              div.ingredient
+                input(type="text" name="ingredientName[]" placeholder="Ingredient name" value=ingredient.name required)
+                input(type="number" name="ingredientQuantity[]" placeholder="Quantity"
+                min="1" max="9999" value=ingredient.quantity required)
+                input(type="text" name="ingredientUnit[]" placeholder="Unit" value=ingredient.unit required)
+                button(type="button" class="deleteIngredientButton") Delete
+          else 
+            div.ingredient
+              input(type="text" name="ingredientName[]" placeholder="Ingredient name" required)
+              input(type="number" name="ingredientQuantity[]" placeholder="Quantity"
+              min="1" max="9999" required)
+              input(type="text" name="ingredientUnit[]" placeholder="Unit"  title="Please enter a valid unit name." required)
+          button(type="button" id="addIngredientButton") Add Ingredient
+
+
+      fieldset.actions
+        button(type="submit") Add Recipe
+        a(href=`/collections/${recipeCollectionId}`) Cancel
+  script(src="/javascripts/recipe.js")
+
+block headerLinks 
+  .actions 
+    a.list(href="/collections") All Collections
+    a.list(href=`/collections/${recipeCollectionId}`) Current Collection

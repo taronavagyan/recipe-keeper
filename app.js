@@ -6,6 +6,18 @@ const { body, validationResult } = require("express-validator");
 const store = require("connect-loki");
 const PgPersistence = require("./lib/pg-persistence");
 const catchError = require("./lib/catch-error");
+const hasDuplicates = require("./lib/hasDuplicates");
+const range = require("./lib/range");
+const titleValidation = (field) => {
+  return [
+    body(field)
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Title is required.")
+      .isLength({ max: 100 })
+      .withMessage("Title must be between 1 and 100 characters."),
+  ];
+};
 
 const app = express();
 const host = "localhost";
@@ -44,9 +56,21 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
+  res.locals.username = req.session.username;
+  res.locals.signedIn = req.session.signedIn;
   res.locals.flash = req.session.flash;
   delete req.session.flash;
   next();
+});
+
+// Detect unauthorized access to routes.
+app.use((req, res, next) => {
+  if (!res.locals.signedIn && req.path !== "/users/signin") {
+    req.session.returnTo = req.originalUrl;
+    res.redirect("/users/signin");
+  } else {
+    next();
+  }
 });
 
 // Redirect to collections
@@ -54,14 +78,69 @@ app.get("/", (req, res) => {
   res.redirect("/collections");
 });
 
-// Render the list of recipe collections
+// Render the list of recipe collections on page 1
 app.get(
   "/collections",
   catchError(async (req, res) => {
+    const FIRST_PAGE = 1;
     let store = res.locals.store;
-    let recipeCollections = await store.sortedRecipeCollections();
 
-    res.render("collections", { recipeCollections });
+    const LAST_PAGE = await store._getCollectionsPageCount();
+    const THIS_PAGE = FIRST_PAGE;
+    const ALL_PAGES = range(LAST_PAGE);
+    let recipeCollections = await store.sortedRecipeCollections(FIRST_PAGE);
+
+    req.flash("p", "You are currently on page 1 of recipe collections.");
+    res.render("collections", {
+      recipeCollections,
+      flash: req.flash(),
+      ALL_PAGES,
+      THIS_PAGE,
+    });
+  })
+);
+
+// Render the list of recipe collections on the specified page
+app.get(
+  "/collections/page/:pageNumber",
+  catchError(async (req, res) => {
+    let store = res.locals.store;
+    const FIRST_PAGE = 1;
+    const LAST_PAGE = await store._getCollectionsPageCount();
+    const THIS_PAGE = req.params.pageNumber;
+    const ALL_PAGES = range(LAST_PAGE);
+
+    if (+THIS_PAGE === 0) res.redirect("/collections");
+
+    const rerenderCollections = async () => {
+      let recipeCollections = await store.sortedRecipeCollections(FIRST_PAGE);
+
+      req.flash("error", "Invalid page number.");
+      req.flash("p", "You are currently on page 1 of recipe collections.");
+      res.render("collections", {
+        recipeCollections,
+        flash: req.flash(),
+        ALL_PAGES,
+        THIS_PAGE: FIRST_PAGE,
+      });
+    };
+
+    let recipeCollections = await store.sortedRecipeCollections(+THIS_PAGE);
+
+    if (!recipeCollections || !Number.isInteger(+THIS_PAGE)) {
+      await rerenderCollections();
+    } else {
+      req.flash(
+        "p",
+        `You are currently on page ${THIS_PAGE} of recipe collections.`
+      );
+      res.render("collections", {
+        recipeCollections,
+        flash: req.flash(),
+        ALL_PAGES,
+        THIS_PAGE,
+      });
+    }
   })
 );
 
@@ -73,14 +152,7 @@ app.get("/collections/new", (req, res) => {
 // Create a new recipe collection
 app.post(
   "/collections",
-  [
-    body("recipeCollectionTitle")
-      .trim()
-      .isLength({ min: 1 })
-      .withMessage("The collection title is required.")
-      .isLength({ max: 100 })
-      .withMessage("Collection title must be between 1 and 100 characters."),
-  ],
+  titleValidation("recipeCollectionTitle"),
   catchError(async (req, res) => {
     let store = res.locals.store;
     let errors = validationResult(req);
@@ -96,12 +168,13 @@ app.post(
     if (!errors.isEmpty()) {
       errors.array().forEach((message) => req.flash("error", message.msg));
       rerenderNewCollection();
-    } else if (await store.findRecipeIdFromTitle(recipeCollectionTitle)) {
+    } else if (
+      await store.findRecipeCollectionIdFromTitle(recipeCollectionTitle)
+    ) {
       req.flash("error", "The collection title must be unique.");
       rerenderNewCollection();
     } else {
       let created = await store.createRecipeCollection(recipeCollectionTitle);
-
       if (!created) {
         req.flash("error", "The recipe collection title must be unique.");
         rerenderNewCollection();
@@ -113,27 +186,105 @@ app.post(
   })
 );
 
-// Render individual recipe collection and its recipes
+// Redirect to recipe collection.
+app.get("/collections/:recipeCollectionId/recipes", (req, res) => {
+  let recipeCollectionId = req.params.recipeCollectionId;
+  res.redirect(`/collections/${recipeCollectionId}`);
+});
+
+// Render individual recipe collection and its recipes on page 1
 app.get(
   "/collections/:recipeCollectionId",
   catchError(async (req, res) => {
     let recipeCollectionId = req.params.recipeCollectionId;
-    let recipeCollection = await res.locals.store.loadRecipeCollection(
+    let store = res.locals.store;
+    const FIRST_PAGE = 1;
+    const LAST_PAGE = await store._getRecipesPageCount(+recipeCollectionId);
+    const ALL_PAGES = range(LAST_PAGE);
+
+    if (Number.isNaN(+recipeCollectionId)) throw new Error("Not found.");
+
+    let recipeCollection = await store.loadRecipeCollection(
       +recipeCollectionId
     );
 
-    if (recipeCollection === undefined) throw new Error("Not found.");
+    if (!recipeCollection) throw new Error("Not found.");
 
-    // Sort recipes in collection
-    recipeCollection.recipes = res.locals.store.sortedRecipes(recipeCollection);
+    recipeCollection.recipes = await store.sortedRecipes(
+      +recipeCollectionId,
+      FIRST_PAGE
+    );
 
+    req.flash("p", `You are currently on page 1 of ${recipeCollection.title}.`);
     res.render("collection", {
       recipeCollection,
+      flash: req.flash(),
+      ALL_PAGES,
+      THIS_PAGE: FIRST_PAGE,
     });
   })
 );
 
-// Edit a recipe
+// Render individual recipe collection and its recipes on the specified page
+app.get(
+  "/collections/:recipeCollectionId/page/:pageNumber",
+  catchError(async (req, res) => {
+    let store = res.locals.store;
+    let recipeCollectionId = req.params.recipeCollectionId;
+    let THIS_PAGE = req.params.pageNumber;
+    const FIRST_PAGE = 1;
+    const LAST_PAGE = await store._getRecipesPageCount(+recipeCollectionId);
+    const ALL_PAGES = range(LAST_PAGE);
+
+    if (+THIS_PAGE === 0) res.redirect(`/collections/${recipeCollectionId}`);
+
+    const rerenderCollection = async () => {
+      recipeCollection.recipes = await store.sortedRecipes(
+        recipeCollectionId,
+        FIRST_PAGE
+      );
+      req.flash("error", "Invalid page number.");
+      req.flash(
+        "p",
+        `You are currently on page 1 of ${recipeCollection.title}.`
+      );
+      res.render("collection", {
+        recipeCollection,
+        flash: req.flash(),
+        ALL_PAGES,
+        THIS_PAGE: FIRST_PAGE,
+      });
+    };
+
+    let recipeCollection = await store.loadRecipeCollection(
+      +recipeCollectionId
+    );
+
+    if (!recipeCollection) throw new Error("Not found.");
+
+    recipeCollection.recipes = await store.sortedRecipes(
+      recipeCollectionId,
+      +THIS_PAGE
+    );
+
+    if (!recipeCollection.recipes || !Number.isInteger(+THIS_PAGE)) {
+      await rerenderCollection();
+    } else {
+      req.flash(
+        "p",
+        `You are currently on page ${THIS_PAGE} of ${recipeCollection.title}.`
+      );
+      res.render("collection", {
+        recipeCollection,
+        flash: req.flash(),
+        ALL_PAGES,
+        THIS_PAGE,
+      });
+    }
+  })
+);
+
+// Display edit recipe page
 app.get(
   "/collections/:recipeCollectionId/recipes/:recipeId/edit",
   catchError(async (req, res) => {
@@ -142,7 +293,6 @@ app.get(
       +recipeCollectionId,
       +recipeId
     );
-    console.log(recipe);
 
     if (!recipe) throw new Error("Not found.");
 
@@ -167,6 +317,7 @@ app.post(
   })
 );
 
+// Display edit recipe collection page
 app.get(
   "/collections/:recipeCollectionId/edit",
   catchError(async (req, res) => {
@@ -181,7 +332,13 @@ app.get(
   })
 );
 
-// List recipe
+// Display new recipe page
+app.get("/collections/:recipeCollectionId/recipes/new", (req, res) => {
+  let recipeCollectionId = req.params.recipeCollectionId;
+  res.render("new-recipe", { recipeCollectionId });
+});
+
+// Display recipe
 app.get(
   "/collections/:recipeCollectionId/recipes/:recipeId",
   catchError(async (req, res) => {
@@ -198,86 +355,202 @@ app.get(
   })
 );
 
-// INPUT VALIDATION NEEDED
 // Edit an existing recipe
 app.post(
   "/collections/:recipeCollectionId/recipes/:recipeId/edit",
+  titleValidation("recipeTitle"),
+  [
+    body("instructions")
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("Instructions are required"),
+  ],
+
   catchError(async (req, res) => {
+    let store = res.locals.store;
     let { recipeCollectionId, recipeId } = { ...req.params };
+    let { recipeTitle, prepTime, totalTime, instructions } = {
+      ...req.body,
+    };
+    const ingredientNames = [].concat(req.body["ingredientName[]"]);
+    const ingredientQuantities = [].concat(req.body["ingredientQuantity[]"]);
+    const ingredientUnits = [].concat(req.body["ingredientUnit[]"]);
+
+    const getIngredientsInfo = () => {
+      return ingredientNames.map((name, index) => {
+        const quantity = ingredientQuantities[index];
+        const unit = ingredientUnits[index];
+        return { name, quantity, unit };
+      });
+    };
+
+    const rerenderEditRecipe = async () => {
+      let recipe = await store.loadRecipe(+recipeCollectionId, +recipeId);
+      if (!recipe) throw new Error("Not found.");
+
+      res.render("edit-recipe", {
+        recipe,
+        flash: req.flash(),
+      });
+    };
+
+    if (ingredientUnits.some((unit) => unit.trim() === "")) {
+      req.flash("error", "Ingredient units are required.");
+      await rerenderEditRecipe();
+    }
+
+    if (hasDuplicates(ingredientNames)) {
+      req.flash("error", "Cannot add the same ingredient more than once.");
+      await rerenderEditRecipe();
+    }
+
+    try {
+      let errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        errors.array().forEach((message) => req.flash("error", message.msg));
+        await rerenderEditRecipe();
+      } else if (
+        await store.existsRecipeTitleInCollection(
+          recipeTitle,
+          +recipeCollectionId,
+          +recipeId
+        )
+      ) {
+        req.flash("error", "The recipe title must be unique.");
+        await rerenderEditRecipe();
+      } else {
+        let ingredientsInfo = getIngredientsInfo();
+
+        let updated = await store.updateRecipe(
+          +recipeId,
+          +recipeCollectionId,
+          recipeTitle,
+          prepTime,
+          totalTime,
+          instructions
+        );
+
+        if (!updated) throw new Error("Not found.");
+
+        let deletedIngredients = await store.deleteAllIngredientsFromRecipe(
+          +recipeId
+        );
+
+        for (let ingIdx = 0; ingIdx < ingredientsInfo.length; ingIdx += 1) {
+          let createdIng = await store.createIngredient(
+            [recipeId].concat(Object.values(ingredientsInfo[ingIdx]))
+          );
+          if (!createdIng) throw new Error("Not found.");
+        }
+
+        req.flash("success", "Recipe updated.");
+        res.redirect(`/collections/${recipeCollectionId}/recipes/${recipeId}`);
+      }
+    } catch (error) {
+      if (store.isUniqueConstraintViolation(error)) {
+        req.flash("error", "The recipe title must be unique.");
+        await rerenderEditRecipe();
+      } else {
+        throw error;
+      }
+    }
   })
 );
 
-// Create a new recipe and add it to the specified collection.
+// Create a new recipe
 app.post(
-  "/collections/:recipeCollectionId/recipes",
+  "/collections/:recipeCollectionId/recipes/new",
+  titleValidation("title"),
   [
-    body("title")
+    body("instructions")
       .trim()
       .isLength({ min: 1 })
-      .withMessage("The recipe title is required.")
-      .isLength({ max: 100 })
-      .withMessage("Recipe title must be between 1 and 100 characters."),
+      .withMessage("Instructions are required"),
   ],
+
   catchError(async (req, res) => {
+    let store = res.locals.store;
     let recipeCollectionId = req.params.recipeCollectionId;
     let recipeTitle = req.body.title;
+    let { prepTime, totalTime, instructions } = { ...req.body };
+    const ingredientNames = [].concat(req.body["ingredientName[]"]);
+    const ingredientQuantities = [].concat(req.body["ingredientQuantity[]"]);
+    const ingredientUnits = [].concat(req.body["ingredientUnit[]"]);
 
-    let errors = validationResult(req);
-
-    if (!errors.isEmpty()) {
-      errors.array().forEach((message) => req.flash("error", message.msg));
-
-      let recipeCollection = res.locals.store.loadRecipeCollection(
-        +recipeCollectionId
-      );
-
-      if (!recipeCollection) throw new Error("Not found.");
-
-      recipeCollection.recipes =
-        res.locals.store.sortedRecipes(recipeCollection);
-
-      res.render("collection", {
-        flash: req.flash(),
-        recipeCollection,
-        recipeTitle,
-      });
-    } else {
-      let store = res.locals.store;
-
-      const ingredientNames = [].concat(req.body["ingredientName[]"]);
-      const ingredientQuantities = [].concat(req.body["ingredientQuantity[]"]);
-      const ingredientUnits = [].concat(req.body["ingredientUnit[]"]);
-
-      const ingredients = ingredientNames.map((name, index) => {
+    const getIngredientsInfo = () => {
+      return ingredientNames.map((name, index) => {
         const quantity = ingredientQuantities[index];
         const unit = ingredientUnits[index];
-        return [name, quantity, unit];
+        return { name, quantity, unit };
       });
+    };
 
-      let { prepTime, totalTime, instructions } = { ...req.body };
+    let ingredientsInfo = getIngredientsInfo();
 
-      let createdRecipe = await store.createRecipe(
-        +recipeCollectionId,
+    const rerenderNewRecipe = async () => {
+      res.render("new-recipe", {
+        flash: req.flash(),
+        recipeCollectionId,
         recipeTitle,
         prepTime,
         totalTime,
         instructions,
-        ingredients
-      );
+        ingredientsInfo,
+      });
+    };
 
-      if (!createdRecipe) throw new Error("Not found.");
+    if (ingredientUnits.some((unit) => unit.trim() === "")) {
+      req.flash("error", "Ingredient units are required.");
+      await rerenderNewRecipe();
+    }
 
-      let recipeId = await store.findRecipeIdFromTitle(recipeTitle);
+    if (hasDuplicates(ingredientNames)) {
+      req.flash("error", "Cannot add the same ingredient more than once.");
+      await rerenderNewRecipe();
+    }
 
-      for (let ingIdx = 0; ingIdx < ingredients.length; ingIdx += 1) {
-        let createdIng = await store.createIngredient(
-          [recipeId].concat(ingredients[ingIdx])
+    try {
+      let errors = validationResult(req);
+
+      if (!errors.isEmpty()) {
+        errors.array().forEach((message) => req.flash("error", message.msg));
+        await rerenderNewRecipe();
+      } else {
+        let createdRecipe = await store.createRecipe(
+          +recipeCollectionId,
+          recipeTitle,
+          prepTime,
+          totalTime,
+          instructions
         );
-        if (!createdIng) throw new Error("Not found.");
-      }
 
-      req.flash("success", "The recipe has been created.");
-      res.redirect(`/collections/${recipeCollectionId}`);
+        if (!createdRecipe) throw new Error("Not found.");
+
+        let recipeId = await store.findRecipeId(
+          recipeTitle,
+          +recipeCollectionId
+        );
+
+        for (let ingIdx = 0; ingIdx < ingredientsInfo.length; ingIdx += 1) {
+          let createdIng = await store.createIngredient(
+            [recipeId].concat(Object.values(ingredientsInfo[ingIdx]))
+          );
+          if (!createdIng) throw new Error("Not found.");
+        }
+
+        req.flash("success", "The recipe has been created.");
+        res.redirect(`/collections/${recipeCollectionId}`);
+      }
+    } catch (error) {
+      if (store.isUniqueConstraintViolation(error)) {
+        req.flash("error", "The recipe title must be unique.");
+        await rerenderNewRecipe();
+      } else if (store.isTimeConstraintViolation(error)) {
+        req.flash("error", "Prep time must not be greater than total time.");
+        await rerenderNewRecipe();
+      } else {
+        throw error;
+      }
     }
   })
 );
@@ -299,16 +572,7 @@ app.post(
 // Edit recipe collection title
 app.post(
   "/collections/:recipeCollectionId/edit",
-  [
-    body("recipeCollectionTitle")
-      .trim()
-      .isLength({ min: 1 })
-      .withMessage("The recipe collection title is required.")
-      .isLength({ max: 100 })
-      .withMessage(
-        "Recipe collection title must be between 1 and 100 characters."
-      ),
-  ],
+  titleValidation("recipeCollectionTitle"),
   catchError(async (req, res) => {
     let store = res.locals.store;
     let recipeCollectionId = req.params.recipeCollectionId;
@@ -332,7 +596,9 @@ app.post(
       if (!errors.isEmpty()) {
         errors.array().forEach((message) => req.flash("error", message.msg));
         await rerenderEditCollection();
-      } else if (await store.findRecipeIdFromTitle(recipeCollectionTitle)) {
+      } else if (
+        await store.findRecipeCollectionIdFromTitle(recipeCollectionTitle)
+      ) {
         req.flash("error", "The collection title must be unique.");
         await rerenderEditCollection();
       } else {
@@ -349,7 +615,7 @@ app.post(
     } catch (error) {
       if (store.isUniqueConstraintViolation(error)) {
         req.flash("error", "The collection title must be unique.");
-        rerenderEditCollection();
+        await rerenderEditCollection();
       } else {
         throw error;
       }
@@ -357,10 +623,58 @@ app.post(
   })
 );
 
+// Render the Sign In page.
+app.get("/users/signin", (req, res) => {
+  req.flash("p", "Please sign in to access Recipe Keeper.");
+  res.render("signin", {
+    flash: req.flash(),
+  });
+});
+
+// Handle Sign In form submission
+app.post(
+  "/users/signin",
+  catchError(async (req, res) => {
+    let username = req.body.username.trim();
+    let password = req.body.password;
+
+    let authenticated = await res.locals.store.authenticate(username, password);
+    if (!authenticated) {
+      req.flash("error", "Invalid credentials.");
+      res.render("signin", {
+        flash: req.flash(),
+        username: req.body.username,
+      });
+    } else {
+      let session = req.session;
+      session.username = username;
+      session.signedIn = true;
+      const returnTo = session.returnTo || "/";
+      delete session.returnTo;
+      res.redirect(returnTo);
+    }
+  })
+);
+
+// Handle Sign Out.
+app.post("/users/signout", (req, res) => {
+  delete req.session.username;
+  delete req.session.signedIn;
+  res.redirect("/users/signin");
+});
+
+// Handle errors.
 app.use((err, req, res, _next) => {
   console.log(err); // Writes more extensive information to the console log
-  res.status(404).send(err.message);
+  res.render("error");
 });
+
+// Handle invalid routes (cannot / GET errors).
+app.use((req, res) => {
+  req.flash("p", "Invalid route. Redirecting to collections page.");
+  res.redirect("/collections");
+});
+
 //Listener
 app.listen(port, host, () => {
   console.log(`Recipe Keeper is listening on port ${port} of ${host}!`);

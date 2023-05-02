@@ -1,5 +1,3 @@
-/* Global styles */
-
 html {
   font-size: 16px;
   font-family: Arial, sans-serif;
@@ -10,19 +8,26 @@ body {
   padding: 0;
 }
 
-/* Header styles */
-
 header {
-  background-color: #333;
+  background-color: #353839;
   color: #fff;
   padding: 1rem;
+}
+
+input {
+  width: 100px;
 }
 
 h1 {
   margin: 0;
   font-size: 2rem;
+  text-align: center;
 }
 
+.signin-block {
+  display: inline-block;
+  margin-left: 15px;
+}
 .actions {
   float: right;
 }
@@ -42,8 +47,6 @@ h1 {
   background-color: #eee;
 }
 
-/* Main styles */
-
 main {
   padding: 1rem;
 }
@@ -57,6 +60,34 @@ main {
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+.text-center {
+  text-align: center;
+}
+#error-page-button {
+  background-color: #4caf50;
+  border: none;
+  color: white;
+  padding: 20px 40px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 24px;
+  margin: 50px auto 0;
+  margin-top: 100px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+#current-page {
+  padding: 5px;
+  background-color: lightblue;
+  border-radius: 5px;
+}
+
+#error-page-button:hover {
+  background-color: #3e8e41;
 }
 
 li {
@@ -73,12 +104,13 @@ li:hover {
 h2 {
   margin: 0 0 0.5rem 0;
   font-size: 1.5rem;
+  color: #ff6633;
 }
 
 p {
   margin: 0;
   font-size: 1.2rem;
-  color: #666;
+  color: darkgoldenrod;
 }
 
 .flash {

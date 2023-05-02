@@ -8,6 +8,8 @@ block main
         button Edit Collection
       form.delete(action=`/collections/${recipeCollection.id}/destroy` method="post")
         button Delete Collection
+      form.add(action=`/collections/${recipeCollection.id}/recipes/new` method="get")
+        button Add Recipe
 
     ul
       each recipe in recipeCollection.recipes
@@ -19,56 +21,15 @@ block main
             button(type="submit") Edit Recipe
           form.delete(action=`/collections/${recipeCollection.id}/recipes/${recipe.id}/destroy` method="post")
             button(type="submit") Delete Recipe
+    .actions 
+      if ALL_PAGES
+        h3= "Pages"
+        each page in ALL_PAGES
+          if page === +THIS_PAGE
+            a#current-page.add(href=`/collections/${recipeCollection.id}/page/${page}`)=`${page}  `
+          else 
+            a.add(href=`/collections/${recipeCollection.id}/page/${page}`)=`${page}  `
 
-
-    form(action=`/collections/${recipeCollection.id}/recipes` method="post")
-      dl
-        dt
-          label(for="title") Enter the new recipe's title:
-        dd
-          input(type="text"
-                name="title"
-                id="title"
-                placeholder="Title"
-                value=title)
-        dt
-          label(for="prepTime") Enter the new recipe's prep time:
-        dd
-          input(type="text"
-                name="prepTime"
-                id="prepTime"
-                placeholder="Prep Time"
-                value=prepTime)
-        dt
-          label(for="totalTime") Enter the new recipe's total cooking time:
-        dd
-          input(type="text"
-                name="totalTime"
-                id="totalTime"
-                placeholder="Total Cook Time"
-                value=totalTime)
-        dt
-          label(for="instructions") Enter the new recipe's instructions:
-        dd
-          textarea(name="instructions"
-                   id="instructions"
-                   placeholder="Instructions"
-                   rows="5"
-                   value=instructions)
-        dt
-          label(for="ingredients") Enter the new recipe's ingredients:
-        dd#ingredients
-          div.ingredient
-            input(type="text" name="ingredientName[]" placeholder="Ingredient name")
-            input(type="text" name="ingredientQuantity[]" placeholder="Quantity")
-            input(type="text" name="ingredientUnit[]" placeholder="Unit")
-          button(type="button" id="addIngredientButton") Add Ingredient
-
-
-      fieldset.actions
-        button Add Recipe
-  script(src="/javascripts/collection.js")
-    
 
 block headerLinks
   .actions
