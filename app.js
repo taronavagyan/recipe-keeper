@@ -333,10 +333,18 @@ app.get(
 );
 
 // Display new recipe page
-app.get("/collections/:recipeCollectionId/recipes/new", (req, res) => {
-  let recipeCollectionId = req.params.recipeCollectionId;
-  res.render("new-recipe", { recipeCollectionId });
-});
+app.get(
+  "/collections/:recipeCollectionId/recipes/new",
+  catchError(async (req, res) => {
+    let recipeCollectionId = req.params.recipeCollectionId;
+
+    if (await res.locals.store.existsRecipeCollection(+recipeCollectionId)) {
+      res.render("new-recipe", { recipeCollectionId });
+    } else {
+      throw new Error("Not found.");
+    }
+  })
+);
 
 // Display recipe
 app.get(
@@ -471,6 +479,11 @@ app.post(
   catchError(async (req, res) => {
     let store = res.locals.store;
     let recipeCollectionId = req.params.recipeCollectionId;
+
+    if (!(await store.existsRecipeCollection(+recipeCollectionId))) {
+      throw new Error("Not found.");
+    }
+
     let recipeTitle = req.body.title;
     let { prepTime, totalTime, instructions } = { ...req.body };
     const ingredientNames = [].concat(req.body["ingredientName[]"]);
