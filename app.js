@@ -176,6 +176,7 @@ app.post(
     } else {
       let created = await store.createRecipeCollection(recipeCollectionTitle);
       if (!created) {
+        console.log("!created");
         req.flash("error", "The recipe collection title must be unique.");
         rerenderNewCollection();
       } else {
@@ -511,6 +512,11 @@ app.post(
         ingredientsInfo,
       });
     };
+
+    if (ingredientNames[0] === undefined) {
+      req.flash("error", "At least one ingredient is required.");
+      await rerenderNewRecipe();
+    }
 
     if (ingredientUnits.some((unit) => unit.trim() === "")) {
       req.flash("error", "Ingredient units are required.");

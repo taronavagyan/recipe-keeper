@@ -52,12 +52,6 @@ block main
                 min="1" max="9999" value=ingredient.quantity required)
                 input(type="text" name="ingredientUnit[]" placeholder="Unit" value=ingredient.unit required)
                 button(type="button" class="deleteIngredientButton") Delete
-          else 
-            div.ingredient
-              input(type="text" name="ingredientName[]" placeholder="Ingredient name" required)
-              input(type="number" name="ingredientQuantity[]" placeholder="Quantity"
-              min="1" max="9999" required)
-              input(type="text" name="ingredientUnit[]" placeholder="Unit"  title="Please enter a valid unit name." required)
           button(type="button" id="addIngredientButton") Add Ingredient
 
 

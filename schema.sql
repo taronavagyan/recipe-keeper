@@ -6,8 +6,9 @@ DROP TABLE IF EXISTS users;
 
 CREATE TABLE recipeCollections (
   id serial PRIMARY KEY,
-  title text NOT NULL UNIQUE,
-  username text NOT NULL
+  title text NOT NULL,
+  username text NOT NULL,
+  UNIQUE (title, username)
 );
 
 CREATE TABLE recipes (
