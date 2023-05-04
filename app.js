@@ -403,6 +403,11 @@ app.post(
       });
     };
 
+    if (ingredientNames[0] === undefined) {
+      req.flash("error", "At least one ingredient is required.");
+      await rerenderEditRecipe();
+    }
+
     if (ingredientUnits.some((unit) => unit.trim() === "")) {
       req.flash("error", "Ingredient units are required.");
       await rerenderEditRecipe();
@@ -690,7 +695,6 @@ app.use((err, req, res, _next) => {
 
 // Handle invalid routes (cannot / GET errors).
 app.use((req, res) => {
-  req.flash("p", "Invalid route. Redirecting to collections page.");
   res.redirect("/collections");
 });
 
