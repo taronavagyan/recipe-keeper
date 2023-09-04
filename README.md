@@ -31,7 +31,7 @@ npm run add-users
 npm start
 ```
 
-3. Use the app by heading to http://localhost:3000 with your browser.
+3. Use the app by heading to http://localhost:3001 with your browser.
 
 ## Usage
 
