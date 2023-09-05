@@ -1,0 +1,14 @@
+extends layout 
+
+block main 
+  if chefs === undefined || chefs === 0
+      p#no_collection You don't have any chefs listed. Why not create one?
+  else
+    ul#lists
+      each chef in chefs
+            h2= chef.name
+            p= `${chef.name} is from the country of ${chef.country}. He or she specializes in cooking ${chef.speciality} and has ${chef.experience} years of experience (and counting)!`
+
+block headerLinks
+  .actions
+    a.add(href="/chefs/new") New Chef

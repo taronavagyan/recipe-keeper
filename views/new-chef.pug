@@ -1,0 +1,44 @@
+extends layout
+
+block main
+  form(action="/chefs" method="post")
+    dl
+      dt
+        label(for="chefName") Enter the name of the new chef: 
+      dd 
+        input(type="text"
+              id="chefName"
+              name="name"
+              placeholder="Chef's Name"
+              value=name)
+
+      dt
+        label(for="chefCountry") Enter the country of the chef: 
+      dd 
+        input(type="text"
+              id="chefCountry"
+              name="country"
+              placeholder="Chef's Country"
+              value=country)
+
+      dt
+        label(for="chefSpeciality") Enter the speciality of the chef: 
+      dd 
+        input(type="text"
+              id="chefSpeciality"
+              name="speciality"
+              placeholder="Chef's Speciality"
+              value=speciality)
+
+      dt
+        label(for="chefExperience") Enter the experience of the chef (in years): 
+      dd 
+        input(type="number"
+              id="chefExperience"
+              name="experience"
+              placeholder="Chef's Experience"
+              value=experience)
+
+    fieldset.actions 
+      input(type="submit" value="Save")
+      a(href="/chefs") Cancel

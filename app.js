@@ -8,6 +8,9 @@ const PgPersistence = require("./lib/pg-persistence");
 const catchError = require("./lib/catch-error");
 const hasDuplicates = require("./lib/hasDuplicates");
 const range = require("./lib/range");
+const Chef = require("./models/chef");
+const openMongoConnection = require("./lib/mongodb-query");
+
 const titleValidation = (field) => {
   return [
     body(field)
@@ -78,6 +81,15 @@ app.get("/", (req, res) => {
   res.redirect("/collections");
 });
 
+app.get(
+  "/chefs",
+  catchError(async (req, res) => {
+    const chefs = await Chef.find();
+
+    res.render("chefs", { chefs });
+  })
+);
+
 // Render the list of recipe collections on page 1
 app.get(
   "/collections",
@@ -144,6 +156,11 @@ app.get(
   })
 );
 
+// Render new chef page
+app.get("/chefs/new", (req, res) => {
+  res.render("new-chef");
+});
+
 // Render new collection page
 app.get("/collections/new", (req, res) => {
   res.render("new-collection");
@@ -184,6 +201,25 @@ app.post(
         res.redirect("/collections");
       }
     }
+  })
+);
+
+// Create a new chef
+app.post(
+  "/chefs",
+  catchError(async (req, res) => {
+    const { name, country, speciality, experience } = req.body;
+
+    const newChef = new Chef({
+      name,
+      country,
+      speciality,
+      experience,
+    });
+
+    await newChef.save();
+    req.flash("success", "New chef added");
+    res.redirect("/chefs");
   })
 );
 
