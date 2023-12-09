@@ -127,3 +127,11 @@ button:hover {
   background-color: #2ecc71;
   color: #fff;
 }
+
+#current-page {
+  padding: 10px 20px;
+  background-color: #3498db;
+  border-radius: 8px;
+  margin: 0 20px;
+  display: inline-block;
+}
